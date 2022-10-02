@@ -1,0 +1,71 @@
+<p>create.html</p>
+
+<image src="" class="hidden image"></image>
+<p class="hidden message"></p>
+
+
+
+<script>
+    let intervalLoop;
+    (async () => {
+    let container = {};
+    location.search.split('&').toString().substr(1).split(",").forEach(item => {
+        container[item.split("=")[0]] = decodeURIComponent(item.split("=")[1]) ?  item.split("=")[1]: "No query strings available" ;
+    });
+    const ID = container.id;
+
+    if(!ID) return window.location.href = "/";
+
+    await callAPI(ID);
+    
+    intervalLoop = setInterval(await callAPI, 5000, ID);
+
+
+    })();
+
+    async function callAPI(ID) {
+        const res = await fetch('getImage', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json, text/plain, */*',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({UUID: ID})
+            }).then(r => r.json());
+
+            if(!res?.image) return window.location.href = "/";
+            
+            console.log(res);
+
+            if(res?.image?.FINISHED === 0) return;
+
+            clearInterval(intervalLoop);
+
+            if(res?.image?.FINISHED === -1) return imageError(res?.image?.MESSAGE);
+            
+            imageDone(res.image);
+    }
+
+    function imageError(m) {
+        const d = document.querySelector('.message');
+        d.innerText = m;
+        d.classList.remove("hidden");
+    }
+
+    function imageDone(image) {
+        console.log("DONE!");
+        const d = document.querySelector('.image');
+        d.src = "/image?id=" + image.UUID;
+        d.classList.remove("hidden");
+    }
+</script>
+
+<style>
+    .hidden {
+        display: none;
+    }
+
+    .image {
+        max-width: 75%;
+    }
+</style>
