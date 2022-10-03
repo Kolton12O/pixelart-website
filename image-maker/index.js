@@ -177,6 +177,8 @@ async function resizeImage(img) {
         interpolation: "nearestNeighbor",
       });
     }
+  } else if(img.width < MAX_WIDTH_AND_HEIGHT || img.height < MAX_WIDTH_AND_HEIGHT) {
+
   }
 
   return img;
@@ -221,6 +223,14 @@ async function errorExit({UUID, MESSAGE}) {
 }
 
 async function createDbConnection(file) {
+
+  try {
+    if(!fs.existsSync(path.resolve(__dirname, "../db"))) fs.mkdirSync(path.resolve(__dirname, "../db"));
+    if(!fs.existsSync(path.resolve(__dirname, "../db/images.db"))) fs.writeFileSync(path.resolve(__dirname, "../db/images.db"), "");
+  } catch(err) {
+    console.log(err);
+  }
+
   console.log("Connecting to " + path.basename(file) + " Database...");
 
   let db;

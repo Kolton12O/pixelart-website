@@ -89,8 +89,9 @@ app.post("/start", async (req, res) => {
     return res.redirect("/#NOT_IMAGE_FILE");
 
   // Move the uploaded image to our upload folder
-  fs.mkdirSync(__dirname + "/upload/" + UUID);
-  const FILE_PATH = __dirname + "/upload/" + UUID + "/" + file?.image.name;
+  if(!fs.existsSync(path.resolve(__dirname, "./upload/"))) fs.mkdirSync(path.resolve(__dirname, "./upload/"));
+  fs.mkdirSync(path.resolve(__dirname, "./upload/" + UUID));
+  const FILE_PATH = path.resolve(__dirname, "./upload/" + UUID + "/" + file?.image.name);
   file?.image.mv(FILE_PATH);
 
   // All good
@@ -165,7 +166,16 @@ async function userHasImageBeingMade(u) {
 }
 
 async function createDbConnection(file) {
+
+  try {
+    if(!fs.existsSync(path.resolve(__dirname, "../db"))) fs.mkdirSync(path.resolve(__dirname, "../db"));
+    if(!fs.existsSync(path.resolve(__dirname, "../db/images.db"))) fs.writeFileSync(path.resolve(__dirname, "../db/images.db"), "");
+  } catch(err) {
+    console.log(err);
+  }
+
   console.log("Connecting to " + path.basename(file) + " Database...");
+
 
   let db;
   try {
@@ -193,3 +203,7 @@ async function createDbConnection(file) {
   //imageMaker.setDatabase(db);
 
 }
+
+process.on('uncaughtException', err => {
+  console.log(`Uncaught Exception: ${err}`)
+})
