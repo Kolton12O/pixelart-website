@@ -163,24 +163,29 @@ async function createNewImage(w, h) {
 }
 
 async function resizeImage(img) {
-  const MAX_WIDTH_AND_HEIGHT = 5000; // Pixels
+  /**
+   * 
+   * Resize the image with the factor of WIDTH_AND_HEIGHT
+   * so the size does not exceed the value of WIDTH_AND_HEIGHT
+   *
+  **/
+ 
+  let WIDTH_AND_HEIGHT = 5000; // Pixels
+  
+  WIDTH_AND_HEIGHT = Math.floor(WIDTH_AND_HEIGHT / BLOCK_SIZE) * SLICE_SIZE;
 
-  if (img.width > MAX_WIDTH_AND_HEIGHT || img.height > MAX_WIDTH_AND_HEIGHT) {
+
     if (img.width > img.height) {
       img = await img.resize({
-        factor: MAX_WIDTH_AND_HEIGHT / img.width,
+        factor: WIDTH_AND_HEIGHT / img.width,
         interpolation: "nearestNeighbor",
       });
     } else {
       img = await img.resize({
-        factor: MAX_WIDTH_AND_HEIGHT / img.height,
+        factor: WIDTH_AND_HEIGHT / img.height,
         interpolation: "nearestNeighbor",
       });
     }
-  } else if(img.width < MAX_WIDTH_AND_HEIGHT || img.height < MAX_WIDTH_AND_HEIGHT) {
-
-  }
-
   return img;
 }
 
