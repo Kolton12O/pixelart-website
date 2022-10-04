@@ -2,8 +2,6 @@ const express = require("express");
 const { Worker } = require("worker_threads");
 const UUID_MAKER = require("uuidjs");
 
-//const imageMaker = require("../image-maker");
-
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
 
@@ -52,11 +50,11 @@ app.get("/", (req, res) => {
 });
 
 app.get("/image", async (req, res) => {
-  if(!req?.query?.id) return res.sendStatus(204);
+  if (!req?.query?.id) return res.sendStatus(204);
 
   const ROW = await getImage(req?.query?.id, true);
 
-  if(!ROW) return res.sendStatus(204);
+  if (!ROW) return res.sendStatus(204);
 
   res.sendFile(ROW.FILE_PATH);
 });
@@ -65,9 +63,11 @@ app.post("/start", async (req, res) => {
   const COOKIES = req.cookies;
 
   try {
-    const doesUserHasImageBeingMade = await userHasImageBeingMade(COOKIES.UUID);
+    const doesUserHaveImageBeingMade = await userHasImageBeingMade(
+      COOKIES.UUID
+    );
 
-    if (doesUserHasImageBeingMade) {
+    if (doesUserHaveImageBeingMade) {
       return res.redirect("/create?id=" + COOKIES.UUID);
     }
   } catch (err) {
@@ -77,25 +77,28 @@ app.post("/start", async (req, res) => {
 
   const UUID = UUID_MAKER.generate();
 
-  // Get the file that was set to our field named "image"
   const file = req.files;
 
   if (file?.image?.truncated) return res.redirect("/#MAX_FILE_SIZE");
-  // If no image submitted, exit
+
   if (!file?.image) return res.redirect("/#NO_FILE");
 
-  // If does not have image mime type prevent from uploading
   if (!/^image/.test(file?.image.mimetype))
     return res.redirect("/#NOT_IMAGE_FILE");
 
-  // Move the uploaded image to our upload folder
-  if(!fs.existsSync(path.resolve(__dirname, "./upload/"))) fs.mkdirSync(path.resolve(__dirname, "./upload/"));
-  fs.mkdirSync(path.resolve(__dirname, "./upload/" + UUID));
-  const FILE_PATH = path.resolve(__dirname, "./upload/" + UUID + "/" + file?.image.name);
-  file?.image.mv(FILE_PATH);
-
-  // All good
-  //res.redirect('/start');
+  try {
+    if (!fs.existsSync(path.resolve(__dirname, "./upload/")))
+      fs.mkdirSync(path.resolve(__dirname, "./upload/"));
+    fs.mkdirSync(path.resolve(__dirname, "./upload/" + UUID));
+    const FILE_PATH = path.resolve(
+      __dirname,
+      "./upload/" + UUID + "/" + file?.image.name
+    );
+    file?.image.mv(FILE_PATH);
+  } catch (err) {
+    console.log(err);
+    return res.send(err);
+  }
 
   res.cookie("UUID", UUID);
 
@@ -108,11 +111,12 @@ app.post("/start", async (req, res) => {
 
   res.redirect("/create?id=" + UUID);
 
-  const w = new Worker(path.resolve(__dirname, "../image-maker/index.js"), { workerData: { UUID: UUID, DATABASE: DATABASE_PATH } });
+  const w = new Worker(path.resolve(__dirname, "../image-maker/index.js"), {
+    workerData: { UUID: UUID, DATABASE: DATABASE_PATH },
+  });
   w.on("error", (err) => {
     console.log(err);
   });
-  //imageMaker.start({UUID: UUID});
 });
 
 app.get("/create", (req, res) => {
@@ -128,8 +132,8 @@ app.post("/getImage", async (req, res) => {
 
   let IMAGE;
   try {
-  IMAGE = await getImage(req.body.UUID);
-  } catch(err) {
+    IMAGE = await getImage(req.body.UUID);
+  } catch (err) {
     console.log(err);
     return res.send(err);
   }
@@ -139,8 +143,6 @@ app.post("/getImage", async (req, res) => {
   }
 
   return res.send({ status: "ok", message: "Unknown ID." });
-
-  //return res.send({status: "ok", message: "Image is not finished yet!"});
 });
 
 app.listen(port, () => {
@@ -150,7 +152,7 @@ app.listen(port, () => {
 async function getImage(u, showFilePath = false) {
   const sql = `SELECT * FROM images WHERE UUID = ?`;
   const r = await DATABASE.get(sql, [u]);
-  if(r && !showFilePath) delete r.FILE_PATH;
+  if (r && !showFilePath) delete r.FILE_PATH;
   return r;
 }
 
@@ -166,16 +168,16 @@ async function userHasImageBeingMade(u) {
 }
 
 async function createDbConnection(file) {
-
   try {
-    if(!fs.existsSync(path.resolve(__dirname, "../db"))) fs.mkdirSync(path.resolve(__dirname, "../db"));
-    if(!fs.existsSync(path.resolve(__dirname, "../db/images.db"))) fs.writeFileSync(path.resolve(__dirname, "../db/images.db"), "");
-  } catch(err) {
+    if (!fs.existsSync(path.resolve(__dirname, "../db")))
+      fs.mkdirSync(path.resolve(__dirname, "../db"));
+    if (!fs.existsSync(path.resolve(__dirname, "../db/images.db")))
+      fs.writeFileSync(path.resolve(__dirname, "../db/images.db"), "");
+  } catch (err) {
     console.log(err);
   }
 
   console.log("Connecting to " + path.basename(file) + " Database...");
-
 
   let db;
   try {
@@ -199,11 +201,8 @@ async function createDbConnection(file) {
   console.log(path.basename(file) + " Database tables created!");
 
   DATABASE = db;
-
-  //imageMaker.setDatabase(db);
-
 }
 
-process.on('uncaughtException', err => {
-  console.log(`Uncaught Exception: ${err}`)
-})
+process.on("uncaughtException", (err) => {
+  console.log(`Uncaught Exception: ${err}`);
+});
