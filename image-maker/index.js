@@ -53,7 +53,7 @@ async function start(UUID) {
 
   let NEW_IMG = await createNewImage(IMG.width, IMG.height);
 
-  NEW_IMG = await doWeirdWork(IMG, NEW_IMG);
+  NEW_IMG = await doWeirdWork({image: IMG, new_image: NEW_IMG, uuid: UUID});
 
   await NEW_IMG.save(ROW.FILE_PATH, { format: "png"});
 
@@ -78,7 +78,7 @@ async function getDatabaseRow(u) {
   return r;
 }
 
-async function doWeirdWork(image, new_image) {
+async function doWeirdWork({ image, new_image, uuid } ) {
   // Main image manipulation
   // get how many slizes
   let widthSlices = Math.floor(image.width / SLICE_SIZE);
@@ -113,16 +113,21 @@ async function doWeirdWork(image, new_image) {
       } catch (e) {
         console.log(e);
         try {
-          fs.unlinkSync(getDatabaseRow.FILE_PATH);
-          fs.unlinkSync(path.dirname(getDatabaseRow.FILE_PATH));
+          const ROW = getDatabaseRow(uuid);
+          fs.unlinkSync(ROW.FILE_PATH);
+          fs.unlinkSync(path.dirname(ROW.FILE_PATH));
         } catch {
           console.log(e);
         }
 
-        // TODO
-        // Send message to DB
+        // Send error message to DB
 
-        ///////////////////////
+        try {
+          await setDatabaseValue({uuid: uuid, key: "MESSAGE" , value: e.toString()});
+          await setDatabaseValue({uuid: uuid, key: "FINISHED" , value: -1});
+        } catch(err) {
+          console.log(err);
+        }
 
         return;
       }
