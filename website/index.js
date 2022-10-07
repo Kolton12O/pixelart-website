@@ -86,14 +86,11 @@ app.post("/start", async (req, res) => {
   if (!/^image/.test(file?.image.mimetype))
     return res.redirect("/#NOT_IMAGE_FILE");
 
+  const FILE_PATH = path.resolve(__dirname,"./upload/" + UUID + "/" + file?.image.name);
+
   try {
-    if (!fs.existsSync(path.resolve(__dirname, "./upload/")))
-      fs.mkdirSync(path.resolve(__dirname, "./upload/"));
+    if (!fs.existsSync(path.resolve(__dirname, "./upload/"))) fs.mkdirSync(path.resolve(__dirname, "./upload/"));
     fs.mkdirSync(path.resolve(__dirname, "./upload/" + UUID));
-    const FILE_PATH = path.resolve(
-      __dirname,
-      "./upload/" + UUID + "/" + file?.image.name
-    );
     file?.image.mv(FILE_PATH);
   } catch (err) {
     console.log(err);

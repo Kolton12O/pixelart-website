@@ -53,7 +53,17 @@ async function start(UUID) {
 
   let NEW_IMG = await createNewImage(IMG.width, IMG.height);
 
-  NEW_IMG = await doWeirdWork({image: IMG, new_image: NEW_IMG, uuid: UUID});
+  try {
+
+    NEW_IMG = await doWeirdWork({image: IMG, new_image: NEW_IMG, uuid: UUID});
+
+  } catch (e) {
+    console.log(e);
+
+    await handleError({error: e, uuid: UUID});
+
+    return;
+  }
 
   await NEW_IMG.save(ROW.FILE_PATH, { format: "png"});
 
@@ -97,7 +107,6 @@ async function doWeirdWork({ image, new_image, uuid } ) {
 
       const result = getAverageColor(histo);
 
-      try {
         let blockImage =
           cachedPhotos[
             allowedBlocks.indexOf(
@@ -110,31 +119,31 @@ async function doWeirdWork({ image, new_image, uuid } ) {
           y: BLOCK_SIZE * h,
           inPlace: true,
         });
-      } catch (e) {
-        console.log(e);
-        try {
-          const ROW = getDatabaseRow(uuid);
-          fs.unlinkSync(ROW.FILE_PATH);
-          fs.unlinkSync(path.dirname(ROW.FILE_PATH));
-        } catch {
-          console.log(e);
-        }
-
-        // Send error message to DB
-
-        try {
-          await setDatabaseValue({uuid: uuid, key: "MESSAGE" , value: e.toString()});
-          await setDatabaseValue({uuid: uuid, key: "FINISHED" , value: -1});
-        } catch(err) {
-          console.log(err);
-        }
-
-        return;
-      }
+      
 
     }
   }
   return new_image;
+}
+
+async function handleError({error, uuid}) {
+  // Unlink files
+  try {
+    const ROW = getDatabaseRow(uuid);
+    fs.unlinkSync(ROW.FILE_PATH);
+    fs.unlinkSync(path.dirname(ROW.FILE_PATH));
+  } catch(e) {
+    console.log(e);
+  }
+
+  // Send error message to DB
+
+  try {
+    await setDatabaseValue({uuid: uuid, key: "MESSAGE" , value: error.toString()});
+    await setDatabaseValue({uuid: uuid, key: "FINISHED" , value: -1});
+  } catch(err) {
+    console.log(err);
+  }
 }
 
 function searchArr(arr, name) {
