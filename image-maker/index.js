@@ -29,7 +29,13 @@ let cachedPhotos = [];
   await loadMinecraftImagesIntoCache();
 
   const DATABASE_PATH = path.resolve(__dirname, __dirname, "../db/images.db");
-  DATABASE = await createDbConnection(DATABASE_PATH);
+
+  try {
+    DATABASE = await createDbConnection(DATABASE_PATH);
+  } catch(err) {
+    await handleError({error: err, uuid: workerData.UUID});
+    return;
+  }
 
   start(workerData.UUID);
 
@@ -37,39 +43,47 @@ let cachedPhotos = [];
 
 async function start(UUID) {
 
-  //const img = sharp('img.jpg');
-  console.log(DATABASE);
-  const ROW = await getDatabaseRow(UUID);
+  let ROW; 
+  try {
+    ROW = await getDatabaseRow(UUID);
+  } catch(err) {
+    await handleError({error: err, uuid: workerData.UUID});
+    return;
+  }
 
   let IMG;
   try { 
-  IMG = await Image.load(ROW.FILE_PATH);
+    IMG = await Image.load(ROW.FILE_PATH);
   } catch(err) {
-    await errorExit({UUID: UUID, MESSAGE: "There was an error processing your image. The image may be corrupted. Please try again"});
-    return console.log(err);
+    await handleError({uuid: UUID, error: "There was an error processing your image. The image may be corrupted. Please try again"});
+    return;
   }
 
-  IMG = await resizeImage(IMG);
-
-  let NEW_IMG = await createNewImage(IMG.width, IMG.height);
-
+  
   try {
+    IMG = await resizeImage(IMG);
+
+    let NEW_IMG = await createNewImage(IMG.width, IMG.height);
 
     NEW_IMG = await doWeirdWork({image: IMG, new_image: NEW_IMG, uuid: UUID});
 
-  } catch (e) {
-    console.log(e);
+    await NEW_IMG.save(ROW.FILE_PATH, { format: "png"});
 
-    await handleError({error: e, uuid: UUID});
+    await setDatabaseValue({uuid: UUID, key: "FINISHED" ,value: 1});
+
+  } catch (err) {
+    console.error(err);
+
+    await handleError({error: err, uuid: UUID});
 
     return;
   }
 
-  await NEW_IMG.save(ROW.FILE_PATH, { format: "png"});
-
-  await setDatabaseValue({uuid: UUID, key: "FINISHED" ,value: 1});
-
+  try {
   await DATABASE.close();
+  } catch(err) {
+    console.error(err);
+  }
 
 }
 
@@ -127,13 +141,14 @@ async function doWeirdWork({ image, new_image, uuid } ) {
 }
 
 async function handleError({error, uuid}) {
+  console.error(err);
   // Unlink files
   try {
     const ROW = getDatabaseRow(uuid);
     fs.unlinkSync(ROW.FILE_PATH);
     fs.unlinkSync(path.dirname(ROW.FILE_PATH));
-  } catch(e) {
-    console.log(e);
+  } catch(err) {
+    console.error(err);
   }
 
   // Send error message to DB
@@ -142,7 +157,13 @@ async function handleError({error, uuid}) {
     await setDatabaseValue({uuid: uuid, key: "MESSAGE" , value: error.toString()});
     await setDatabaseValue({uuid: uuid, key: "FINISHED" , value: -1});
   } catch(err) {
-    console.log(err);
+    console.error(err);
+  }
+
+  try {
+  await DATABASE.close();
+  } catch(err) {
+    console.error(err);
   }
 }
 
@@ -230,52 +251,20 @@ function mean(histogram) {
   return sum / total;
 }
 
-async function errorExit({UUID, MESSAGE}) {
-  await setDatabaseValue({uuid: UUID, key: "MESSAGE", value: MESSAGE});
-  await setDatabaseValue({uuid: UUID, key: "FINISHED", value: -1});
-
-  const file = await getDatabaseRow(UUID).then(r => r.FILE_PATH);
-  fs.rmSync(path.resolve(__dirname, file));
-  fs.rmdirSync(path.dirname(file));
-  
-  await DATABASE.close();
-}
-
 async function createDbConnection(file) {
 
   try {
     if(!fs.existsSync(path.resolve(__dirname, "../db"))) fs.mkdirSync(path.resolve(__dirname, "../db"));
     if(!fs.existsSync(path.resolve(__dirname, "../db/images.db"))) fs.writeFileSync(path.resolve(__dirname, "../db/images.db"), "");
   } catch(err) {
-    console.log(err);
-  }
-
-  console.log("Connecting to " + path.basename(file) + " Database...");
-
-  let db;
-  try {
-    db = await open({ filename: file, driver: sqlite3.Database });
-  } catch (err) {
     console.error(err);
   }
 
-  console.log("Connected to " + path.basename(file) + " Database!");
+  let db = await open({ filename: file, driver: sqlite3.Database });
 
-  console.log("Creating to " + path.basename(file) + " Database tables...");
-
-  try {
-    await db.run(
-      "CREATE TABLE IF NOT EXISTS images(UUID TEXT, FILE_PATH TEXT, START_TIME NUMERIC, MESSAGE TEXT, FINISHED NUMERIC)"
-    );
-  } catch (err) {
-    console.error(err);
-  }
-
-  console.log(path.basename(file) + " Database tables created!");
+  await db.run("CREATE TABLE IF NOT EXISTS images(UUID TEXT, FILE_PATH TEXT, START_TIME NUMERIC, MESSAGE TEXT, FINISHED NUMERIC)");
 
   return db;
-
-  //imageMaker.setDatabase(db);
 
 }
 
